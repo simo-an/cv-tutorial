@@ -1,14 +1,11 @@
 from imageio import imread, imsave
 from torch.autograd import Variable
 from scipy.signal import gaussian
+from utils import init_parameter
 
 import torch
 import torch.nn as nn
 import numpy as np
-
-def init_parameters(layer, w, b):
-    layer.weight.data.copy_(torch.from_numpy(w))
-    layer.bias.data.copy_(torch.from_numpy(b))
 
 class GaussianSmoothingNet(nn.Module):
     def __init__(self) -> None:
@@ -23,8 +20,8 @@ class GaussianSmoothingNet(nn.Module):
         self.GFV = nn.Conv2d(1, 1, kernel_size=(filter_size,1), padding=(filter_size//2,0))
 
         # 设置 w 的值为 高斯平滑核, b 的值为 0.0
-        init_parameters(self.GFH, generated_filters, np.array([0.0])) 
-        init_parameters(self.GFV, generated_filters.T, np.array([0.0])) 
+        init_parameter(self.GFH, generated_filters, np.array([0.0])) 
+        init_parameter(self.GFV, generated_filters.T, np.array([0.0])) 
 
     def forward(self, img):
         img_r = img[:,0:1]  # 取出RGB三个通道的数据
