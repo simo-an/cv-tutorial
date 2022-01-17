@@ -8,49 +8,77 @@ import torch
 import torch.nn as nn
 import numpy as np
 
-PAI = 3.1415926
 
 class NonMaxSupression(nn.Module):
     def __init__(self) -> None:
         super(NonMaxSupression, self).__init__()
-        sobel_filter = np.array([[-1, 0, 1],
-                                 [-2, 0, 2],
-                                 [-1, 0, 1]])
-        self.SFH = nn.Conv2d(1, 1, kernel_size=sobel_filter.shape, padding=sobel_filter.shape[0]//2)
-        self.SFV = nn.Conv2d(1, 1, kernel_size=sobel_filter.shape, padding=sobel_filter.shape[0]//2)
+        # Roberts 算子用于检测各种角度的边
+        filter_0 = np.array([   [ 0, 0, 0],
+                                [ 0, 1, -1],
+                                [ 0, 0, 0]])
 
-        init_parameter(self.SFH, sobel_filter, np.array([0.0]))
-        init_parameter(self.SFV, sobel_filter.T, np.array([0.0]))
+        filter_45 = np.array([  [0, 0, 0],
+                                [ 0, 1, 0],
+                                [ 0, 0, -1]])
 
-    def forward(self, img):
-        img_r = img[:,0:1]
-        img_g = img[:,1:2]
-        img_b = img[:,2:3]
+        filter_90 = np.array([  [ 0, 0, 0],
+                                [ 0, 1, 0],
+                                [ 0,-1, 0]])
 
-        # # SFH(V): sobel filter of horizontal(vertical) 水平（竖直）方向的Sobel滤波
-        grad_r_x = self.SFH(img_r)  # 通道 R 的 x 方向梯度
-        grad_r_y = self.SFV(img_r)
-        grad_g_x = self.SFH(img_g)
-        grad_g_y = self.SFV(img_g)
-        grad_b_x = self.SFH(img_b)
-        grad_b_y = self.SFV(img_b)
+        filter_135 = np.array([ [ 0, 0, 0],
+                                [ 0, 1, 0],
+                                [-1, 0, 0]])
 
-        # 计算强度（magnitude） 和 方向（orientation）
-        magnitude_r = torch.sqrt(grad_r_x**2 + grad_r_y**2) # Gr^2 = Grx^2 + Gry^2
-        magnitude_g = torch.sqrt(grad_g_x**2 + grad_g_y**2) 
-        magnitude_b = torch.sqrt(grad_b_x**2 + grad_b_y**2)
+        filter_180 = np.array([ [ 0, 0, 0],
+                                [-1, 1, 0],
+                                [ 0, 0, 0]])
 
-        grad_magnitude = magnitude_r + magnitude_g + magnitude_b
+        filter_225 = np.array([ [-1, 0, 0],
+                                [ 0, 1, 0],
+                                [ 0, 0, 0]])
 
-        grad_y = grad_r_y + grad_g_y + grad_b_y
-        grad_x = grad_r_x + grad_g_x + grad_b_x
+        filter_270 = np.array([ [ 0,-1, 0],
+                                [ 0, 1, 0],
+                                [ 0, 0, 0]])
 
-        # tanθ = grad_y / grad_x 转化为角度 （方向角）
-        grad_orientation = (torch.atan2(grad_y, grad_x) * (180.0 / PAI)) 
-        grad_orientation =  torch.round(grad_orientation / 45.0) * 45.0  # 转化为 45 的倍数
+        filter_315 = np.array([ [ 0, 0, -1],
+                                [ 0, 1, 0],
+                                [ 0, 0, 0]])
+
+        all_filters = np.stack([filter_0, filter_45, filter_90, filter_135, filter_180, filter_225, filter_270, filter_315])
         
-        return grad_magnitude, grad_orientation
+        self.directional_filter = nn.Conv2d(1, 8, kernel_size=filter_0.shape, padding=filter_0.shape[-1] // 2)
 
+        init_parameter(self.directional_filter, all_filters[:, None, ...], np.zeros(shape=(all_filters.shape[0],)))
+
+
+    def forward(self, grad_magnitude, grad_orientation):
+
+        all_filtered = self.directional_filter(grad_magnitude)
+
+        inidices_positive = (grad_orientation / 45) % 8
+        inidices_negative = ((grad_orientation / 45) + 4) % 8
+
+        height = inidices_positive.size()[2]
+        width = inidices_positive.size()[3]
+        pixel_count = height * width
+        pixel_range = torch.FloatTensor([range(pixel_count)])
+
+        indices = (inidices_positive.view(-1).data * pixel_count + pixel_range).squeeze()
+        channel_select_filtered_positive = all_filtered.view(-1)[indices.long()].view(1, height, width)
+
+        indices = (inidices_negative.view(-1).data * pixel_count + pixel_range).squeeze()
+        channel_select_filtered_negative = all_filtered.view(-1)[indices.long()].view(1, height, width)
+
+        channel_select_filtered = torch.stack([channel_select_filtered_positive, channel_select_filtered_negative])
+
+        is_max = channel_select_filtered.min(dim=0)[0] > 0.0
+        is_max = torch.unsqueeze(is_max, dim=0)
+
+        thin_edges = grad_magnitude.clone()
+        thin_edges[is_max==0] = 0.0
+
+        return thin_edges
 
 
 if __name__ == '__main__':
@@ -69,5 +97,8 @@ if __name__ == '__main__':
     sobel_net.eval()
     grad_magnitude, grad_orientation = sobel_net(denoising_img)
 
-    # 保存梯度强度图
-    imsave('grad_magnitude.png',grad_magnitude.data.numpy()[0,0])
+    # 进行非极大化抑制
+    nms_net = NonMaxSupression()
+    nms_net.eval()
+    thin_edge_img = nms_net(grad_magnitude, grad_orientation)
+    imsave('thin_edge_img.png',thin_edge_img.data.numpy()[0,0])

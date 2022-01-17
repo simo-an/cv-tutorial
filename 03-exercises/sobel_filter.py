@@ -68,5 +68,5 @@ if __name__ == '__main__':
     sobel_net.eval()
     grad_magnitude, grad_orientation = sobel_net(denoising_img)
 
-    print(grad_magnitude)
-    print(grad_orientation)
+    # 保存梯度强度图
+    imsave('grad_magnitude.png',grad_magnitude.data.numpy()[0,0])
