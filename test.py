@@ -1,72 +1,60 @@
-from imageio import imread, imsave
-from torch.autograd import Variable
-
+from re import A
 import torch
-import torch.nn as nn
-import numpy as np
 
-def init_parameter(layer, w, b):
-    layer.weight.data.copy_(torch.from_numpy(w))
-    layer.bias.data.copy_(torch.from_numpy(b))
+width = 8
+height = 8
 
-class NonMaxSupression(nn.Module):
-    def __init__(self) -> None:
-        super(NonMaxSupression, self).__init__()
-        # Roberts 算子用于检测各种角度的边
-        filter_0 = np.array([   [ 0, 0, 0],
-                                [ 0, 1,-1],
-                                [ 0, 0, 0]])
+high = torch.eye(8)
 
-        filter_45 = np.array([  [ 0, 0, 0],
-                                [ 0, 1, 0],
-                                [ 0, 0,-1]])
+visited = torch.zeros_like(high)
+final = torch.zeros_like(high).float()
 
-        filter_90 = np.array([  [ 0, 0, 0],
-                                [ 0, 1, 0],
-                                [ 0,-1, 0]])
+high[3, 3] = 0.0
+high[0, 3] = 1.0
+high[1, 4] = 1.0
+high[2, 5] = 1.0
+high[2, 6] = 1.0
+high[3, 7] = 1.0
+high[0, 6] = 1.0
 
-        filter_135 = np.array([ [ 0, 0, 0],
-                                [ 0, 1, 0],
-                                [-1, 0, 0]])
+low = high.clone()
 
-        filter_180 = np.array([ [ 0, 0, 0],
-                                [-1, 1, 0],
-                                [ 0, 0, 0]])
+low[3, 3] = 1.0
+low[1, 6] = 1.0
+low[5, 1] = 1.0
+low[6, 2] = 1.0
 
-        filter_225 = np.array([ [-1, 0, 0],
-                                [ 0, 1, 0],
-                                [ 0, 0, 0]])
+def connected(x, y):
+    left = x - 1
+    top = y - 1
 
-        filter_270 = np.array([ [ 0,-1, 0],
-                                [ 0, 1, 0],
-                                [ 0, 0, 0]])
+    if left < 0 or top < 0:
+        return False
+    
+    return final[left, top] > 0 or final[left, y] > 0 or final[x, top] > 0
 
-        filter_315 = np.array([ [ 0, 0,-1],
-                                [ 0, 1, 0],
-                                [ 0, 0, 0]])
+def trace(x:int, y:int):
+    right = x + 1
+    bottom = y + 1
+    if right >= width or bottom >= height:
+        return
 
-        all_filters = np.stack([filter_0, filter_45, filter_90, filter_135, filter_180, filter_225, filter_270, filter_315])
-        
-        self.directional_filter = nn.Conv2d(1, 8, kernel_size=filter_0.shape, padding=filter_0.shape[-1] // 2)
+    pass_high = high[x, y] > 0.0
+    pass_low = low[x, y] > 0.0
 
-        init_parameter(self.directional_filter, all_filters[:, None, ...], np.zeros(shape=(all_filters.shape[0],)))
+    if pass_high:
+        final[x, y] = high[x, y]
+    elif pass_low and not pass_high:
+        if connected(x, y):
+            print(x, y)
+            final[x, y] = low[x, y]
+    
+    trace(right, y)
+    trace(x, bottom)    
+    trace(right, bottom)
 
+trace(0, 0)
 
-    def forward(self, grad_magnitude):
-        all_filtered = self.directional_filter(grad_magnitude)
-        print(all_filtered)
-        print(all_filtered.view(-1))
-
-
-# if __name__ == '__main__':
-#     # 进行非极大化抑制
-#     grad_magnitude = torch.ones((1, 1, 3, 3))
-#     print(grad_magnitude)
-#     nms_net = NonMaxSupression()
-#     nms_net.eval()
-#     nms_net(Variable(grad_magnitude))
-
-X = np.array(range(12)).reshape((3, 4))
-
-print(X)
-print(X[:, 0:2])    
+print(low)
+print(high)
+print(final)
