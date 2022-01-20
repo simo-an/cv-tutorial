@@ -1,12 +1,8 @@
-from random import randint
-from tkinter.messagebox import NO
-from turtle import pen, right
 from imageio import imread, imsave
 from torch.autograd import Variable
 from gaussian_smoothing import GaussianSmoothingNet
 from sobel_filter import SobelFilterNet
 from nonmax_supression import NonMaxSupression
-from utils import init_parameter
 
 import torch
 import torch.nn as nn
