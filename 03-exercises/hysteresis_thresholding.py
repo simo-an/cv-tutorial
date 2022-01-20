@@ -1,4 +1,6 @@
 from random import randint
+from tkinter.messagebox import NO
+from turtle import pen, right
 from imageio import imread, imsave
 from torch.autograd import Variable
 from gaussian_smoothing import GaussianSmoothingNet
@@ -23,65 +25,92 @@ class HysteresisThresholding(nn.Module):
         low_thresh = low_thresh.squeeze()
         final_image = high_thresh.squeeze().clone()
 
-        height = final_image.shape[0] - 1 
-        width = final_image.shape[1] - 1
-
-        def connected(x, y, gap = 1):
-            right = x + gap
-            bottom = y + gap
-            left = x - gap
-            top = y - gap
-
-            if left < 0 or top < 0 or right >= width or bottom >= height:
-                return False
-            
-            return final_image[top, left] > 0  or final_image[top, x] > 0 or final_image[top, right] > 0 \
-                or final_image[y, left] > 0 or final_image[y, right] > 0 \
-                or final_image[bottom, left] > 0 or final_image[bottom, x] > 0 or final_image[bottom, right] > 0
-
-        # 先高再宽
-        def trace(x:int, y:int):
-            right = x + 1
-            bottom = y + 1
-            left = x - 1
-            top = y - 1
-            if left < 0 or top < 0 or right >= width or bottom >= height or died[y, x] or final_image[y, x] > 0:
-                return
-
-            pass_high = final_image[y, x] > 0.0
-            pass_low = low_thresh[y, x] > 0.0
-
-            died[y, x] = True
-
-            if pass_high:
-                died[y, x] = False
-            elif pass_low and not pass_high:
-                if connected(x, y) or connected(x, y, 2): # 如果其他方向有连接
-                    final_image[y, x] = low_thresh[y, x]
-                    died[y, x] = False
-            
-            # 往回
-            if final_image[y, x] > 0.0: # 当前点有连接
-                if low_thresh[top, left] > 0: trace(left, top)
-                if low_thresh[top, x] > 0: trace(x, top)    
-                if low_thresh[top, right] > 0: trace(right, top)
-                if low_thresh[y, left] > 0: trace(left, y)
-                if low_thresh[bottom, left] > 0: trace(left, bottom)
-
-            # 往下
-            trace(right, y)
-            trace(x, bottom)
-            trace(right, bottom)
+        height = final_image.shape[0]
+        width = final_image.shape[1]
+        '''
+        def trace_right_bottom():
+            for x in range(1, width-1):
+                right = x + 1
+                for y in range(1, height-1):
+                    bottom = y + 1
+                    if final_image[y, x]: # 当前点有连接
+                        if low_thresh[y, right] > 0.0: final_image[y, right] = low_thresh[y, right]        # 正右
+                        if low_thresh[bottom, x] > 0.0: final_image[bottom, x] = low_thresh[bottom, x]       # 正下
+                        if low_thresh[bottom, right] > 0.0: final_image[bottom, right] = low_thresh[bottom, right]   # 右下
         
-        for i in range(width):
-            for j in range(height):
-                trace(i, j)
+        def trace_left_top():
+            for x in range(1, width-1):
+                cx = width - x
+                left = cx - 1
+                for y in range(1, height-1):
+                    cy = height - y
+                    top = cy - 1
+                    if final_image[cy, cx]: # 当前点有连接
+                        if low_thresh[cy, left] > 0.0: final_image[cy, left] = low_thresh[cy, left]        # 正左
+                        if low_thresh[top, cx] > 0.0: final_image[top, cx] = low_thresh[top, cx]       # 正上
+                        if low_thresh[top, left] > 0.0: final_image[top, left] = low_thresh[top, left]   # 左上
+
+        def trace_right_top():
+            for x in range(1, width-1):
+                cx = width - x
+                left = cx - 1
+                for y in range(1, height-1):
+                    bottom = y + 1
+                    if final_image[y, cx]: # 当前点有连接
+                        if low_thresh[y, left] > 0.0: final_image[y, left] = low_thresh[y, left]        # 正左
+                        if low_thresh[bottom, cx] > 0.0: final_image[bottom, cx] = low_thresh[bottom, cx]       # 正下
+                        if low_thresh[bottom, left] > 0.0: final_image[bottom, left] = low_thresh[bottom, left]   # 左下
+
+        def trace_left_bottom():
+            for x in range(1, width-1):
+                right = x + 1
+                for y in range(1, height-1):
+                    cy = height - y
+                    top = cy - 1
+                    if final_image[cy, x]: # 当前点有连接
+                        if low_thresh[cy, right] > 0.0: final_image[cy, right] = low_thresh[cy, right]        # 正右
+                        if low_thresh[top, x] > 0.0: final_image[top, x] = low_thresh[top, x]       # 正上
+                        if low_thresh[top, right] > 0.0: final_image[top, right] = low_thresh[top, right]   # 右上
+
+        '''
+        def trace(direction):
+            if not direction: return
+            for x in range(1, width - 1):
+                cx = x
+                if direction == 'left-top' or direction == 'left-bottom':
+                    cx = width - 1 - x
+                left = cx - 1
+                right = cx + 1
+                for y in range(1, height - 1):
+                    cy = y
+                    if direction == 'left-top' or direction == 'right-top':
+                        cy = height - 1 - y
+                    top = cy - 1
+                    bottom = cy + 1
+                    if final_image[cy, cx]: # 当前点有连接
+                        if low_thresh[top, left] > 0.0: final_image[top, left] = low_thresh[top, left]   # 左上
+                        if low_thresh[top, cx] > 0.0: final_image[top, cx] = low_thresh[top, cx]       # 正上
+                        if low_thresh[top, right] > 0.0: final_image[top, right] = low_thresh[top, right]   # 右上
+                        
+                        if low_thresh[cy, left] > 0.0: final_image[cy, left] = low_thresh[cy, left]        # 正左
+                        if low_thresh[cy, right] > 0.0: final_image[cy, right] = low_thresh[cy, right]        # 正右
+                        
+                        if low_thresh[bottom, left] > 0.0: final_image[bottom, left] = low_thresh[bottom, left]   # 左下
+                        if low_thresh[bottom, cx] > 0.0: final_image[bottom, cx] = low_thresh[bottom, cx]       # 正下
+                        if low_thresh[bottom, right] > 0.0: final_image[bottom, right] = low_thresh[bottom, right]   # 右下
+
+
+        trace('right-bottom')
+        trace('left-top')
+        trace('right-top')
+        trace('left-bottom')
+
 
         final_image = final_image.unsqueeze(dim=0).unsqueeze(dim=0)
 
         return final_image
 
-    def forward(self, thin_edges, grad_magnitude, grad_orientation):
+    def forward(self, thin_edges):
         low_thresholded: torch.Tensor = thin_edges.clone()
         low_thresholded[thin_edges<self.low_threshold] = 0.0
 
@@ -117,8 +146,8 @@ if __name__ == '__main__':
 
     ht_net = HysteresisThresholding()
     ht_net.eval()
+    low_thresholded, high_thresholded, final_thresholded = ht_net(thin_edge_img)
 
-    low_thresholded, high_thresholded, final_thresholded = ht_net(thin_edge_img, grad_magnitude, grad_orientation)
     imsave('low_thresholded.png', to_bw(low_thresholded.data.cpu().numpy()[0, 0]))
     imsave('high_thresholded.png', to_bw(high_thresholded.data.cpu().numpy()[0, 0]))
     imsave('final_thresholded.png', to_bw(final_thresholded.data.cpu().numpy()[0, 0]))
