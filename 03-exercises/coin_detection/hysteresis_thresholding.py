@@ -120,7 +120,7 @@ class HysteresisThresholding(nn.Module):
 if __name__ == '__main__':
     # 读取图片
     # raw_img = imread('03-exercises/coin.png') / 255.0
-    raw_img = imread('coin.png') / 255.0
+    raw_img = imread('image/coin.png') / 255.0
     img = torch.from_numpy(raw_img.transpose((2, 0, 1)))
     batch = torch.stack([img]).float()
 
@@ -138,13 +138,13 @@ if __name__ == '__main__':
     nms_net = NonMaxSupression()
     nms_net.eval()
     thin_edge_img = nms_net(grad_magnitude, grad_orientation)
-    imsave('thin_edge_img.png', thin_edge_img.data.numpy()[0,0])
+    imsave('image/thin_edge_img.png', thin_edge_img.data.numpy()[0,0])
 
     ht_net = HysteresisThresholding()
     ht_net.eval()
     low_thresholded, high_thresholded, final_thresholded = ht_net(thin_edge_img)
 
-    imsave('low_thresholded.png', to_bw(low_thresholded.data.cpu().numpy()[0, 0]))
-    imsave('high_thresholded.png', to_bw(high_thresholded.data.cpu().numpy()[0, 0]))
-    imsave('final_thresholded.png', to_bw(final_thresholded.data.cpu().numpy()[0, 0]))
+    imsave('image/low_thresholded.png', to_bw(low_thresholded.data.cpu().numpy()[0, 0]))
+    imsave('image/high_thresholded.png', to_bw(high_thresholded.data.cpu().numpy()[0, 0]))
+    imsave('image/final_thresholded.png', to_bw(final_thresholded.data.cpu().numpy()[0, 0]))
 
