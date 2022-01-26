@@ -120,7 +120,7 @@ class HysteresisThresholding(nn.Module):
 if __name__ == '__main__':
     # 读取图片
     # raw_img = imread('03-exercises/coin.png') / 255.0
-    raw_img = imread('image/coin.png') / 255.0
+    raw_img = imread('image/desk.png') / 255.0
     img = torch.from_numpy(raw_img.transpose((2, 0, 1)))
     batch = torch.stack([img]).float()
 

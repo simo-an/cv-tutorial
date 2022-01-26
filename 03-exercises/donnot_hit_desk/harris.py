@@ -1,4 +1,3 @@
-import imp
 from imageio import imread, imsave
 import numpy as np
 import cv2 as cv
@@ -35,7 +34,7 @@ def detect_corners(img:np.ndarray, win_size:int, k:float, thresh:int):
 
             r = det - k * tr
 
-            if r > 0:
+            if r > thresh:
                 corners.append((x, y))
     
 
@@ -49,20 +48,21 @@ def change_color(img:np.ndarray, point, RGB):
 
 def main():
     # 定义一些超参
-    win_size = 6
-    k = 0.05
-    thresh = 10
+    win_size = 8
+    k = 0.1
+    thresh = 0
 
     # 读取图片
-    img:np.ndarray = imread('desk.png')
-    gray_img:np.ndarray = cv.cvtColor(img, cv.COLOR_BGR2GRAY) / 255.0
+    rgb_img:np.ndarray = imread('desk.png')
+    gray_img:np.ndarray = cv.cvtColor(rgb_img, cv.COLOR_BGR2GRAY) / 255.0
+    # gray_img:np.ndarray = imread('f.png') / 255.0
 
     corners = detect_corners(gray_img, win_size, k, thresh)
 
     for corner in corners:
-        change_color(img, corner, (255, 0, 0))
+        change_color(rgb_img, corner, (255, 0, 0))
     
-    imsave('temp.png', img)
+    imsave('temp.png', rgb_img)
 
 if __name__ == "__main__":
     main()
