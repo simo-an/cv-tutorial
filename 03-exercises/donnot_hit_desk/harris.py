@@ -48,12 +48,12 @@ def change_color(img:np.ndarray, point, RGB):
 
 def main():
     # 定义一些超参
-    win_size = 8
+    win_size = 6
     k = 0.1
     thresh = 0
 
     # 读取图片
-    rgb_img:np.ndarray = imread('desk.png')
+    rgb_img:np.ndarray = imread('bench.png')
     gray_img:np.ndarray = cv.cvtColor(rgb_img, cv.COLOR_BGR2GRAY) / 255.0
     # gray_img:np.ndarray = imread('f.png') / 255.0
 
